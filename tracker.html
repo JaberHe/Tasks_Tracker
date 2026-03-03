@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Routine" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <title>Routine</title>
+
+  <!-- PWA Manifest inline -->
+  <script>
+    const manifest = {
+      name: "Routine – Tracker quotidien",
+      short_name: "Routine",
+      start_url: ".",
+      display: "standalone",
+      background_color: "#0a0a0f",
+      theme_color: "#0a0a0f",
+      icons: [{
+        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%230a0a0f'/%3E%3Ccircle cx='256' cy='256' r='160' fill='none' stroke='%23e8d5a3' stroke-width='24'/%3E%3Ctext x='256' y='310' text-anchor='middle' font-size='160' fill='%23e8d5a3' font-family='serif'%3E✓%3C/text%3E%3C/svg%3E",
+        sizes: "512x512",
+        type: "image/svg+xml",
+        purpose: "any maskable"
+      }]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = URL.createObjectURL(blob);
+    document.head.appendChild(link);
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #1a1a24;
+      --border: rgba(255,255,255,0.07);
+      --text: #f0ece0;
+      --text-dim: #7a7870;
+      --accent: #e8d5a3;
+
+      --green: #5cdb8a;
+      --green-bg: rgba(92, 219, 138, 0.08);
+      --orange: #f0a04b;
+      --orange-bg: rgba(240, 160, 75, 0.08);
+      --red: #e05c5c;
+      --red-bg: rgba(224, 92, 92, 0.08);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      overscroll-behavior: none;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100dvh;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: calc(env(safe-area-inset-top) + 24px) 24px 20px;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+    }
+
+    header p {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 3px;
+      font-weight: 300;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Main scroll area ── */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 16px 120px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      text-align: center;
+      gap: 12px;
+      opacity: 0;
+      animation: fadeIn 0.6s 0.2s ease forwards;
+    }
+
+    .empty-icon {
+      font-size: 52px;
+      opacity: 0.25;
+    }
+
+    .empty h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 400;
+      color: var(--text-dim);
+    }
+
+    .empty p {
+      font-size: 14px;
+      color: var(--text-dim);
+      opacity: 0.6;
+      line-height: 1.5;
+    }
+
+    /* ── Task list ── */
+    #task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      padding: 18px 18px 18px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      gap: 2px 12px;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      animation: slideIn 0.35s ease both;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+      border-radius: 18px 0 0 18px;
+      transition: background 0.4s ease;
+    }
+
+    .card.green::before { background: var(--green); }
+    .card.orange::before { background: var(--orange); }
+    .card.red::before { background: var(--red); }
+
+    .card.green { background: color-mix(in srgb, var(--surface) 85%, var(--green-bg)); }
+    .card.orange { background: color-mix(in srgb, var(--surface) 85%, var(--orange-bg)); }
+    .card.red { background: color-mix(in srgb, var(--surface) 85%, var(--red-bg)); }
+
+    .card:active { transform: scale(0.985); }
+
+    .card-info {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .card-name {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: -0.1px;
+      line-height: 1.3;
+    }
+
+    .card-sub {
+      font-size: 11.5px;
+      font-weight: 300;
+      color: var(--text-dim);
+      margin-top: 3px;
+    }
+
+    .card-days {
+      grid-column: 1;
+      grid-row: 2;
+      margin-top: 10px;
+    }
+
+    .days-number {
+      font-family: 'Playfair Display', serif;
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1;
+      transition: color 0.4s ease;
+    }
+
+    .card.green .days-number { color: var(--green); }
+    .card.orange .days-number { color: var(--orange); }
+    .card.red .days-number { color: var(--red); }
+    .card.new-today .days-number { color: var(--accent); }
+    .card.new-today::before { background: var(--accent); }
+
+    .days-label {
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-left: 2px;
+    }
+
+    /* ── Right side buttons ── */
+    .card-actions {
+      grid-column: 2;
+      grid-row: 1 / 3;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 8px;
+      height: 100%;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 16px;
+      padding: 4px;
+      opacity: 0.4;
+      transition: opacity 0.2s;
+      line-height: 1;
+    }
+
+    .btn-delete:hover { opacity: 0.8; }
+
+    .btn-done {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 10px 16px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      letter-spacing: 0.2px;
+    }
+
+    .btn-done:active {
+      transform: scale(0.93);
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    /* ── Floating Add Button ── */
+    #fab {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom) + 28px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      font-size: 28px;
+      color: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 32px rgba(232, 213, 163, 0.3), 0 2px 8px rgba(0,0,0,0.4);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      z-index: 100;
+    }
+
+    #fab:active {
+      transform: translateX(-50%) scale(0.9);
+      box-shadow: 0 4px 16px rgba(232, 213, 163, 0.2);
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: 28px 28px 0 0;
+      width: 100%;
+      padding: 12px 24px calc(env(safe-area-inset-bottom) + 32px);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .modal-overlay.open .modal {
+      transform: translateY(0);
+    }
+
+    .modal-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 24px;
+    }
+
+    .modal h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 20px;
+    }
+
+    .modal input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .modal input::placeholder { color: var(--text-dim); }
+    .modal input:focus { border-color: var(--accent); }
+
+    /* Quick suggestions */
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .suggestion {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 7px 14px;
+      font-size: 13px;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .suggestion:active {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    .btn-add-confirm {
+      width: 100%;
+      margin-top: 20px;
+      background: var(--accent);
+      border: none;
+      border-radius: 14px;
+      padding: 17px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--bg);
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .btn-add-confirm:active {
+      opacity: 0.85;
+      transform: scale(0.98);
+    }
+
+    /* ── Done flash animation ── */
+    @keyframes doneFlash {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(0.97); }
+      70%  { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    .card.just-done {
+      animation: doneFlash 0.4s ease;
+    }
+
+    /* ── Entry animations ── */
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    /* ── Delete swipe out ── */
+    .card.removing {
+      animation: slideOut 0.3s ease forwards;
+    }
+
+    @keyframes slideOut {
+      to { opacity: 0; transform: translateX(60px) scale(0.95); max-height: 0; margin: 0; padding: 0; border: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Routine</h1>
+  <p id="header-sub">Chargement…</p>
+</header>
+
+<main>
+  <div id="task-list"></div>
+  <div class="empty" id="empty-state" style="display:none">
+    <div class="empty-icon">🌿</div>
+    <h2>Aucune tâche</h2>
+    <p>Appuie sur <strong>+</strong> pour ajouter<br>tes premières tâches récurrentes.</p>
+  </div>
+</main>
+
+<button id="fab" aria-label="Ajouter une tâche">+</button>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <div class="modal-handle"></div>
+    <h2>Nouvelle tâche</h2>
+    <input type="text" id="new-task-input" placeholder="Ex: Lessive, Appeler maman…" maxlength="50" autocomplete="off" />
+    <div class="suggestions">
+      <span class="suggestion" onclick="fillSuggestion(this)">Lessive</span>
+      <span class="suggestion" onclick="fillSuggestion(this)">Changer draps</span>
+      <span class="suggestion" onclick="fillSuggestion(this)">Appeler maman</span>
+      <span class="suggestion" onclick="fillSuggestion(this)">Sport</span>
+      <span class="suggestion" onclick="fillSuggestion(this)">Ménage</span>
+      <span class="suggestion" onclick="fillSuggestion(this)">Plantes</span>
+      <span class="suggestion" onclick="fillSuggestion(this)">Courses</span>
+      <span class="suggestion" onclick="fillSuggestion(this)">Douche</span>
+    </div>
+    <button class="btn-add-confirm" onclick="confirmAdd()">Ajouter</button>
+  </div>
+</div>
+
+<script>
+  // ── State ──
+  const STORAGE_KEY = 'routine_tasks_v1';
+  let tasks = [];
+
+  function loadTasks() {
+    try {
+      tasks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    } catch { tasks = []; }
+  }
+
+  function saveTasks() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  }
+
+  // ── Utils ──
+  function today() {
+    return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  }
+
+  function daysSince(dateStr) {
+    if (!dateStr) return 999;
+    const then = new Date(dateStr);
+    const now = new Date(today());
+    return Math.floor((now - then) / 86400000);
+  }
+
+  function urgencyClass(days) {
+    if (days === 0) return 'new-today';
+    if (days <= 3) return 'green';
+    if (days <= 7) return 'orange';
+    return 'red';
+  }
+
+  function formatSub(days) {
+    if (days === 0) return 'Fait aujourd\'hui ✓';
+    if (days === 1) return 'Depuis hier';
+    return `Depuis ${days} jours`;
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  // ── Render ──
+  function render() {
+    const list = document.getElementById('task-list');
+    const empty = document.getElementById('empty-state');
+    const sub = document.getElementById('header-sub');
+
+    // Sort: most days first (most urgent on top)
+    const sorted = [...tasks].sort((a, b) => daysSince(b.lastDone) - daysSince(a.lastDone));
+
+    // Overdue count for header
+    const overdue = tasks.filter(t => daysSince(t.lastDone) > 7).length;
+    if (tasks.length === 0) {
+      sub.textContent = 'Aucune tâche configurée';
+    } else if (overdue > 0) {
+      sub.textContent = `${overdue} tâche${overdue > 1 ? 's' : ''} en retard`;
+    } else {
+      sub.textContent = `${tasks.length} tâche${tasks.length > 1 ? 's' : ''} suivie${tasks.length > 1 ? 's' : ''}`;
+    }
+
+    if (tasks.length === 0) {
+      list.innerHTML = '';
+      empty.style.display = 'flex';
+      return;
+    }
+
+    empty.style.display = 'none';
+
+    list.innerHTML = '';
+    sorted.forEach((task, i) => {
+      const days = daysSince(task.lastDone);
+      const cls = urgencyClass(days);
+      const card = document.createElement('div');
+      card.className = `card ${cls}`;
+      card.dataset.id = task.id;
+      card.style.animationDelay = `${i * 40}ms`;
+
+      card.innerHTML = `
+        <div class="card-info">
+          <div class="card-name">${escHtml(task.name)}</div>
+          <div class="card-sub">${formatSub(days)}</div>
+        </div>
+        <div class="card-actions">
+          <button class="btn-delete" onclick="deleteTask('${task.id}')" aria-label="Supprimer">×</button>
+          <button class="btn-done" onclick="markDone('${task.id}')">C'est fait ✓</button>
+        </div>
+        <div class="card-days">
+          <span class="days-number">${days}</span>
+          <span class="days-label">${days <= 1 ? 'jour' : 'jours'}</span>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Actions ──
+  function markDone(id) {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    task.lastDone = today();
+    saveTasks();
+
+    // Flash animation then re-render
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) {
+      card.classList.add('just-done');
+      card.addEventListener('animationend', () => render(), { once: true });
+    } else {
+      render();
+    }
+  }
+
+  function deleteTask(id) {
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) {
+      card.classList.add('removing');
+      card.addEventListener('animationend', () => {
+        tasks = tasks.filter(t => t.id !== id);
+        saveTasks();
+        render();
+      }, { once: true });
+    }
+  }
+
+  // ── Modal ──
+  const overlay = document.getElementById('modal-overlay');
+  const input = document.getElementById('new-task-input');
+
+  document.getElementById('fab').addEventListener('click', openModal);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeModal();
+  });
+
+  function openModal() {
+    overlay.classList.add('open');
+    setTimeout(() => input.focus(), 350);
+  }
+
+  function closeModal() {
+    overlay.classList.remove('open');
+    input.value = '';
+  }
+
+  function fillSuggestion(el) {
+    input.value = el.textContent;
+    input.focus();
+  }
+
+  function confirmAdd() {
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+
+    // Avoid duplicates
+    if (tasks.find(t => t.name.toLowerCase() === name.toLowerCase())) {
+      input.style.borderColor = 'var(--red)';
+      setTimeout(() => input.style.borderColor = '', 800);
+      return;
+    }
+
+    tasks.push({ id: uid(), name, lastDone: null });
+    saveTasks();
+    closeModal();
+    render();
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmAdd();
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // ── Init ──
+  loadTasks();
+  render();
+
+  // Service Worker for PWA offline
+  if ('serviceWorker' in navigator) {
+    const sw = `
+      self.addEventListener('install', e => self.skipWaiting());
+      self.addEventListener('activate', e => clients.claim());
+      self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+    `;
+    const blob = new Blob([sw], { type: 'application/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+  }
+</script>
+</body>
+</html>
